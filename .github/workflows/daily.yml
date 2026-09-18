@@ -41,9 +41,6 @@ jobs:
           key: te-data-${{ github.run_id }}
           restore-keys: te-data-
 
-      - uses: actions/configure-pages@v5
-        id: pages
-
       - name: Keep the previous build for the digest diff
         run: cp dashboard/data/dashboard.json "${RUNNER_TEMP}/prev.json" || true
 
@@ -56,30 +53,25 @@ jobs:
         continue-on-error: true
         run: python -m pytest tests -q
 
-      # Posting the digest as an issue makes GitHub send it by email, so no mail
-      # credentials are needed. The cc line guarantees a mention notification even if
-      # the repo is not being watched.
-      - name: Post digest
-        if: ${{ !cancelled() }}
-        env:
-          GH_TOKEN: ${{ github.token }}
-        run: |
-          python -m scripts.email_digest \
-            --current dashboard/data/dashboard.json \
-            --previous "${RUNNER_TEMP}/prev.json" \
-            --out "${RUNNER_TEMP}/digest.md" \
-            --subject-out "${RUNNER_TEMP}/subject.txt" \
-            --site-url "${{ steps.pages.outputs.base_url }}"
-          printf '\n\ncc @%s\n' '${{ github.repository_owner }}' >> "${RUNNER_TEMP}/digest.md"
-          gh label create digest --color 0E8A16 --description "Daily dashboard digest" --force
-          gh issue create \
-            --title "$(cat "${RUNNER_TEMP}/subject.txt")" \
-            --body-file "${RUNNER_TEMP}/digest.md" \
-            --label digest
+      # Static twins of the first five charts, published with the site so the
+      # digest can point at real image URLs.
+      - name: Render chart images
+        run: python -m scripts.render_charts --out dashboard/email
 
       - uses: actions/upload-pages-artifact@v3
         with:
           path: dashboard
+
+      # Carries the two JSON files the digest needs into the notify job.
+      - name: Upload digest inputs
+        uses: actions/upload-artifact@v4
+        with:
+          name: digest-inputs
+          path: |
+            dashboard/data/dashboard.json
+            ${{ runner.temp }}/prev.json
+          if-no-files-found: warn
+          retention-days: 1
 
       - name: Fail if the build failed
         if: steps.build.outcome == 'failure'
@@ -95,6 +87,49 @@ jobs:
     environment:
       name: github-pages
       url: ${{ steps.deployment.outputs.page_url }}
+    outputs:
+      page_url: ${{ steps.deployment.outputs.page_url }}
     steps:
       - id: deployment
         uses: actions/deploy-pages@v4
+
+  # Runs after deploy so the chart images are live before the issue references
+  # them — GitHub's image proxy fetches on render and caches what it gets.
+  notify:
+    needs: [refresh, deploy]
+    if: ${{ !cancelled() }}
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.14"
+
+      - uses: actions/download-artifact@v4
+        with:
+          name: digest-inputs
+          path: digest-inputs
+
+      # Posting the digest as an issue makes GitHub send it by email, so no mail
+      # credentials are needed. The cc line guarantees a mention notification even
+      # if the repo is not being watched.
+      - name: Post digest
+        env:
+          GH_TOKEN: ${{ github.token }}
+          SITE: ${{ needs.deploy.outputs.page_url }}
+        run: |
+          python -m scripts.email_digest \
+            --current digest-inputs/dashboard/data/dashboard.json \
+            --previous digest-inputs/prev.json \
+            --out "${RUNNER_TEMP}/digest.md" \
+            --subject-out "${RUNNER_TEMP}/subject.txt" \
+            --site-url "${SITE}" \
+            --image-base "${SITE}email" \
+            --image-version "${{ github.run_id }}"
+          printf '\n\ncc @%s\n' '${{ github.repository_owner }}' >> "${RUNNER_TEMP}/digest.md"
+          gh label create digest --color 0E8A16 --description "Daily dashboard digest" --force
+          gh issue create \
+            --title "$(cat "${RUNNER_TEMP}/subject.txt")" \
+            --body-file "${RUNNER_TEMP}/digest.md" \
+            --label digest

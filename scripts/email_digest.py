@@ -90,7 +90,18 @@ def _change(key: str, cur: dict, prev: dict, dfmt) -> str:
     return ("+" if delta > 0 else "-") + dfmt(abs(delta))
 
 
-def build(cur: dict, prev: dict | None, site_url: str) -> tuple[str, str]:
+# Rendered by scripts/render_charts.py and published with the site.
+CHARTS = [
+    ("index.png", "Volume, price and spend"),
+    ("elasticity.png", "Price elasticity of token demand"),
+    ("growth.png", "Growth momentum"),
+    ("price.png", "Average price vs same-model price"),
+    ("mix.png", "Token share by model maker"),
+]
+
+
+def build(cur: dict, prev: dict | None, site_url: str,
+          image_base: str = "", image_version: str = "") -> tuple[str, str]:
     k = cur.get("kpis", {})
     errors = cur.get("errors") or {}
     warnings = cur.get("warnings") or []
@@ -108,7 +119,10 @@ def build(cur: dict, prev: dict | None, site_url: str) -> tuple[str, str]:
     prev_kpis = (prev or {}).get("kpis", {})
     generated = cur.get("generated_at", datetime.now(timezone.utc).isoformat())
 
-    lines = [
+    lines = []
+    if site_url:
+        lines += [f"### [Open the dashboard]({site_url})", ""]
+    lines += [
         f"**Data week of {k.get('week', 'unknown')}** · built {generated}",
         "",
         "| Metric | Now | Since last run |",
@@ -119,17 +133,25 @@ def build(cur: dict, prev: dict | None, site_url: str) -> tuple[str, str]:
         value = fmt(v) if isinstance(v, (int, float)) else "n/a"
         lines.append(f"| {label} | **{value}** | {_change(key, k, prev_kpis, dfmt)} |")
 
+    if prev is not None and all(prev_kpis.get(key) == k.get(key) for key, *_ in ROWS):
+        lines += ["", "_No KPI changed since the previous run — the upstream weekly data has "
+                  "not refreshed yet._"]
+
+    if image_base:
+        # The version query busts GitHub's image proxy cache, which would otherwise
+        # keep serving the first day's PNG at an unchanging URL.
+        suffix = f"?v={image_version}" if image_version else ""
+        lines += ["", "## Token usage, price and spend", ""]
+        for filename, alt in CHARTS:
+            lines += [f"![{alt}]({image_base.rstrip('/')}/{filename}{suffix})", ""]
+
     if errors:
         lines += ["", "### Failed sources", ""]
         lines += [f"- **{name}**: {msg}" for name, msg in errors.items()]
     if warnings:
         lines += ["", "### Warnings", ""]
         lines += [f"- {w}" for w in warnings[:12]]
-    if prev is not None and all(prev_kpis.get(key) == k.get(key) for key, *_ in ROWS):
-        lines += ["", "_No KPI changed since the previous run — the upstream weekly data has "
-                  "not refreshed yet._"]
-    if site_url:
-        lines += ["", f"[Open the dashboard]({site_url})"]
+
     lines += ["", "---", "", "OpenRouter covers its own marketplace only — direct API and "
               "enterprise traffic are not included, so treat volumes as directional."]
     return title, "\n".join(lines)
@@ -142,6 +164,8 @@ def main() -> int:
     ap.add_argument("--out", default="digest.md")
     ap.add_argument("--subject-out", default="subject.txt")
     ap.add_argument("--site-url", default="")
+    ap.add_argument("--image-base", default="", help="published URL of the chart PNGs")
+    ap.add_argument("--image-version", default="", help="cache-busting token for image URLs")
     args = ap.parse_args()
 
     cur = json.loads(Path(args.current).read_text(encoding="utf-8"))
@@ -152,7 +176,7 @@ def main() -> int:
         except json.JSONDecodeError:
             prev = None
 
-    title, body = build(cur, prev, args.site_url)
+    title, body = build(cur, prev, args.site_url, args.image_base, args.image_version)
     Path(args.out).write_text(body, encoding="utf-8")
     Path(args.subject_out).write_text(title, encoding="utf-8")
     print(title)

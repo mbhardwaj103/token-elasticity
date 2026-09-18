@@ -8,3 +8,4 @@ data/build.log
 # Daily source snapshots: ~3 MB/day and refetchable. CI carries these in the
 # Actions cache; data/cache/wayback stays tracked because it cannot be refetched cheaply.
 data/raw/
+dashboard/email/
