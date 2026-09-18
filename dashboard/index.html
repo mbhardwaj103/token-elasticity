@@ -1,0 +1,197 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Token Elasticity</title>
+<style>
+  :root {
+    color-scheme: light;
+    --page: #f9f9f7;
+    --surface: #fcfcfb;
+    --ink: #0b0b0b;
+    --ink-2: #52514e;
+    --muted: #898781;
+    --grid: #e1e0d9;
+    --axis: #c3c2b7;
+    --border: rgba(11,11,11,0.10);
+    --s1: #2a78d6; --s2: #eb6834; --s3: #1baf7a; --s4: #eda100;
+    --s5: #e87ba4; --s6: #008300; --s7: #4a3aa7; --s8: #e34948;
+    --good: #006300; --critical: #d03b3b; --warning: #fab219;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root:where(:not([data-theme="light"])) {
+      color-scheme: dark;
+      --page: #0d0d0d; --surface: #1a1a19; --ink: #ffffff; --ink-2: #c3c2b7; --muted: #898781;
+      --grid: #2c2c2a; --axis: #383835; --border: rgba(255,255,255,0.10);
+      --s1: #3987e5; --s2: #d95926; --s3: #199e70; --s4: #c98500;
+      --s5: #d55181; --s6: #008300; --s7: #9085e9; --s8: #e66767;
+      --good: #0ca30c; --critical: #e66767;
+    }
+  }
+  :root[data-theme="dark"] {
+    color-scheme: dark;
+    --page: #0d0d0d; --surface: #1a1a19; --ink: #ffffff; --ink-2: #c3c2b7; --muted: #898781;
+    --grid: #2c2c2a; --axis: #383835; --border: rgba(255,255,255,0.10);
+    --s1: #3987e5; --s2: #d95926; --s3: #199e70; --s4: #c98500;
+    --s5: #d55181; --s6: #008300; --s7: #9085e9; --s8: #e66767;
+    --good: #0ca30c; --critical: #e66767;
+  }
+  * { box-sizing: border-box; }
+  body { margin: 0; background: var(--page); color: var(--ink); font: 14px/1.5 system-ui, -apple-system, "Segoe UI", sans-serif; }
+  .wrap { max-width: 1240px; margin: 0 auto; padding-inline: 16px; padding-block: 24px 48px; }
+  header { display: flex; flex-wrap: wrap; align-items: flex-end; justify-content: space-between; gap: 12px 24px; margin-bottom: 20px; }
+  h1 { font-size: 22px; font-weight: 600; margin: 0 0 2px; letter-spacing: -0.01em; }
+  .sub { color: var(--ink-2); margin: 0; max-width: 70ch; }
+  header > div { min-width: 0; }
+  .controls { display: flex; flex-wrap: wrap; align-items: center; gap: 10px; min-width: 0; }
+  .tile, .tile .label, .tile .delta { min-width: 0; overflow-wrap: anywhere; }
+  .updated { color: var(--muted); font-size: 12px; }
+  button { font: inherit; color: var(--ink); background: var(--surface); border: 1px solid var(--border); border-radius: 8px; padding: 6px 12px; cursor: pointer; }
+  button:hover { border-color: var(--axis); }
+  button:disabled { opacity: 0.6; cursor: progress; }
+  button[aria-pressed="true"] { border-color: var(--ink-2); font-weight: 600; }
+  .seg { display: inline-flex; gap: 4px; }
+  .banner { border: 1px solid var(--border); border-left: 3px solid var(--warning); background: var(--surface); border-radius: 8px; padding: 8px 12px; margin-bottom: 16px; color: var(--ink-2); font-size: 13px; }
+  .banner summary { cursor: pointer; color: var(--ink); }
+  .banner ul { margin: 6px 0 0; padding-left: 18px; }
+  .kpis { display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 12px; margin-bottom: 24px; }
+  .tile { background: var(--surface); border: 1px solid var(--border); border-radius: 12px; padding: 14px 16px; }
+  .tile .label { color: var(--ink-2); font-size: 13px; }
+  .tile .value { font-size: 26px; font-weight: 600; margin-top: 2px; letter-spacing: -0.01em; }
+  .tile .delta { font-size: 12px; color: var(--muted); }
+  .tile .delta .up { color: var(--good); }
+  .tile .delta .down { color: var(--critical); }
+  section h2 { font-size: 16px; font-weight: 600; margin: 32px 0 4px; }
+  section > p.lede { color: var(--ink-2); margin: 0 0 12px; max-width: 80ch; }
+  .grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 520px), 1fr)); gap: 16px; }
+  .card { background: var(--surface); border: 1px solid var(--border); border-radius: 12px; padding: 16px; min-width: 0; }
+  .card.wide { grid-column: 1 / -1; }
+  .card h3 { font-size: 14px; font-weight: 600; margin: 0; }
+  .card .note { color: var(--muted); font-size: 12px; margin: 2px 0 8px; }
+  .card .cardwarn { color: var(--ink-2); font-size: 12px; border-left: 3px solid var(--warning); padding-left: 8px; margin: 4px 0 8px; }
+  .chart { width: 100%; height: 320px; }
+  .card.wide .chart { height: 380px; }
+  .card.loading .chart { opacity: 0.5; transition: opacity .2s; }
+  details.table { margin-top: 8px; font-size: 12px; }
+  details.table summary { cursor: pointer; color: var(--ink-2); }
+  .tablewrap { overflow-x: auto; max-height: 260px; overflow-y: auto; margin-top: 6px; }
+  table { border-collapse: collapse; width: 100%; font-variant-numeric: tabular-nums; }
+  th, td { text-align: right; padding: 3px 8px; border-bottom: 1px solid var(--grid); white-space: nowrap; }
+  th:first-child, td:first-child { text-align: left; }
+  th { color: var(--ink-2); font-weight: 600; position: sticky; top: 0; background: var(--surface); }
+  footer { margin-top: 40px; color: var(--ink-2); font-size: 13px; }
+  footer h2 { font-size: 15px; color: var(--ink); }
+  footer li { margin-bottom: 4px; }
+  a { color: var(--s1); }
+  .empty { color: var(--muted); padding: 40px 0; text-align: center; }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <div>
+      <h1>Token Elasticity</h1>
+      <p class="sub">Is AI use growing, is it getting cheaper, and how fast are people and businesses adopting it? Token volume and prices from OpenRouter; adoption from Microsoft, the US Census, Gallup and Pew.</p>
+    </div>
+    <div class="controls">
+      <span class="seg" role="group" aria-label="Time range">
+        <button data-range="13" aria-pressed="false">3M</button>
+        <button data-range="26" aria-pressed="false">6M</button>
+        <button data-range="0" aria-pressed="true">All</button>
+      </span>
+      <span class="updated" id="updated">Loading…</span>
+      <button id="refresh" title="Fetch the latest data from every source (takes about a minute)">Refresh data</button>
+    </div>
+  </header>
+
+  <div id="banner"></div>
+  <div class="kpis" id="kpis"></div>
+
+  <section>
+    <h2>Token usage, price and spend</h2>
+    <p class="lede">All three lines start at 100 so they share one axis. If volume rises faster than price falls, spend grows. Only traffic that goes through OpenRouter is counted, so read this as a signal of the direction things are moving.</p>
+    <div class="grid">
+      <div class="card wide" data-sources="openrouter_model_chart price_history">
+        <h3>Volume, price and spend (index, first week = 100, log scale)</h3>
+        <p class="note">Weekly tokens · average price per 1M tokens across tracked models · implied spend (volume × price)</p>
+        <div class="chart" id="c-index"></div>
+      </div>
+      <div class="card" data-sources="openrouter_model_chart price_history">
+        <h3>Price elasticity of token demand</h3>
+        <p class="note">12-week rolling slope of Δln(tokens) on Δln(price). Below −1: price cuts grow total spend. Shows correlation, not cause.</p>
+        <div class="chart" id="c-elasticity"></div>
+      </div>
+      <div class="card" data-sources="openrouter_model_chart">
+        <h3>Growth momentum</h3>
+        <p class="note">Week-over-week token growth (bars) and 4-week growth of the moving average (line), %</p>
+        <div class="chart" id="c-growth"></div>
+      </div>
+      <div class="card" data-sources="price_history">
+        <h3>Average price vs same-model price</h3>
+        <p class="note">Average price reflects both price cuts and the shift to cheaper models. The same-model index keeps last week's model mix fixed, so it moves only with real price changes.</p>
+        <div class="chart" id="c-price"></div>
+      </div>
+      <div class="card" data-sources="openrouter_author_share">
+        <h3>Token share by model maker</h3>
+        <p class="note">Share of weekly tokens, % — shifts here explain moves in the average price</p>
+        <div class="chart" id="c-mix"></div>
+      </div>
+    </div>
+  </section>
+
+  <section>
+    <h2>Adoption</h2>
+    <p class="lede">The solid line is the world: the share of working-age people who used generative AI. Dashed lines are US industries: the share of businesses that used AI in the last two weeks.</p>
+    <div class="grid">
+      <div class="card wide" data-sources="ai_user_share census_btos">
+        <h3>AI adoption: world (solid) vs US industries (dashed)</h3>
+        <p class="note">World: Microsoft AI Diffusion (% of people aged 15–64). US: Census BTOS (% of businesses using AI in last 2 weeks).</p>
+        <div class="chart" id="c-adoption"></div>
+      </div>
+      <div class="card" data-sources="census_btos">
+        <h3>Adoption speed: US businesses</h3>
+        <p class="note">Current use vs expected use in 6 months, with a fitted S-curve projection (dotted)</p>
+        <div class="chart" id="c-speed"></div>
+      </div>
+      <div class="card" data-sources="ai_user_share">
+        <h3>AI user share by country</h3>
+        <p class="note">% of working-age population using generative AI (Microsoft AI Diffusion, via Our World in Data)</p>
+        <div class="chart" id="c-countries"></div>
+      </div>
+    </div>
+  </section>
+
+  <section>
+    <h2>How actively do adopters use AI?</h2>
+    <p class="lede">Having tried AI is not the same as using it every day. These survey series split users by how often they use it.</p>
+    <div class="grid">
+      <div class="card" data-sources="intensity_manual">
+        <h3>US workers: how often they use AI at work (Gallup)</h3>
+        <p class="note">% of US employees · daily · a few times a week or more · a few times a year or more</p>
+        <div class="chart" id="c-gallup"></div>
+      </div>
+      <div class="card" data-sources="intensity_manual worldbank_population">
+        <h3>US adults using chatbots (Pew) and tokens per AI user</h3>
+        <p class="note" id="tpu-note">% of US adults who use chatbots, and the share who use them daily</p>
+        <div class="chart" id="c-pew"></div>
+      </div>
+    </div>
+  </section>
+
+  <footer>
+    <h2>Sources and caveats</h2>
+    <ul>
+      <li><strong>Token volume:</strong> <a href="https://openrouter.ai/rankings">OpenRouter rankings</a> (CC BY 4.0). OpenRouter carries only part of all AI traffic: people who call OpenAI, Anthropic or Google directly, or through enterprise contracts, don't show up. The public chart names the top ~9 models each week and groups the rest (~35–50% of tokens) as "Others".</li>
+      <li><strong>Prices:</strong> OpenRouter's public price list (<code>/api/v1/models</code>), historical copies from the <a href="https://web.archive.org/">Internet Archive</a>, and snapshots saved on every refresh. Each model's price is weighted by the measured ratio of prompt to completion tokens. Free and unpriced stealth models count as $0. "Others" is excluded from price, and its token share is shown as price coverage.</li>
+      <li><strong>Elasticity:</strong> the rolling regression slope of weekly changes in log volume on weekly changes in log price. New model releases, new use cases (agents, coding) and price cuts all happen at once, so treat it as a descriptive statistic, not a causal demand estimate.</li>
+      <li><strong>World adoption:</strong> Microsoft AI Economy Institute, AI Diffusion Report, via <a href="https://ourworldindata.org/grapher/estimated-share-people-generative-ai">Our World in Data</a>.</li>
+      <li><strong>US business adoption:</strong> <a href="https://www.census.gov/programs-surveys/btos.html">US Census Bureau, Business Trends and Outlook Survey</a> (every two weeks).</li>
+      <li><strong>Usage frequency:</strong> <a href="https://www.gallup.com/workplace/704225/rising-adoption-spurs-workforce-changes.aspx">Gallup workforce survey</a> and <a href="https://www.pewresearch.org/internet/2026/06/17/americans-and-ai-2026-chatbots-smart-devices-and-views-on-impact/">Pew Research Center</a> (entered by hand in <code>data/manual/intensity.csv</code>).</li>
+    </ul>
+  </footer>
+</div>
+<script src="vendor/echarts.min.js"></script>
+<script src="app.js"></script>
+</body>
+</html>

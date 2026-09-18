@@ -1,0 +1,95 @@
+name: Daily refresh
+
+on:
+  schedule:
+    # 12:00 UTC = 07:00 US Central (CDT) / 06:00 (CST). Cron here is always UTC.
+    - cron: "0 12 * * *"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+concurrency:
+  group: pages
+  cancel-in-progress: false
+
+jobs:
+  refresh:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.14"
+          cache: pip
+
+      - run: pip install -r requirements.txt
+
+      # Raw snapshots and the Wayback cache ride in the Actions cache instead of git:
+      # they grow ~3 MB/day, which would bloat the repo permanently.
+      - name: Restore data snapshots
+        uses: actions/cache@v4
+        with:
+          path: |
+            data/raw
+            data/cache
+            dashboard/data/dashboard.json
+          key: te-data-${{ github.run_id }}
+          restore-keys: te-data-
+
+      - uses: actions/configure-pages@v5
+        id: pages
+
+      - name: Keep the previous build for the digest diff
+        run: cp dashboard/data/dashboard.json "${RUNNER_TEMP}/prev.json" || true
+
+      - name: Build dashboard
+        id: build
+        continue-on-error: true
+        run: python -m pipeline.build
+
+      - name: Run metric tests
+        continue-on-error: true
+        run: python -m pytest tests -q
+
+      - name: Send email digest
+        if: ${{ !cancelled() }}
+        env:
+          SMTP_HOST: ${{ secrets.SMTP_HOST || 'smtp.gmail.com' }}
+          SMTP_PORT: ${{ secrets.SMTP_PORT || '587' }}
+          SMTP_USER: ${{ secrets.SMTP_USER }}
+          SMTP_PASS: ${{ secrets.SMTP_PASS }}
+          MAIL_TO: ${{ secrets.MAIL_TO }}
+        run: |
+          python -m scripts.email_digest \
+            --current dashboard/data/dashboard.json \
+            --previous "${RUNNER_TEMP}/prev.json" \
+            --out "${RUNNER_TEMP}/digest.html" \
+            --subject-out "${RUNNER_TEMP}/subject.txt" \
+            --site-url "${{ steps.pages.outputs.base_url }}" \
+            --send
+
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: dashboard
+
+      - name: Fail if the build failed
+        if: steps.build.outcome == 'failure'
+        run: |
+          echo "pipeline.build failed — dashboard may be showing the previous snapshot" >&2
+          exit 1
+
+  # Still publish when the build failed: the artifact then holds the last good data.
+  deploy:
+    needs: refresh
+    if: ${{ !cancelled() }}
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - id: deployment
+        uses: actions/deploy-pages@v4

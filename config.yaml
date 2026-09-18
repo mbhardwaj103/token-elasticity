@@ -1,0 +1,51 @@
+# Token Elasticity dashboard configuration
+
+http:
+  user_agent: "Mozilla/5.0 (token-elasticity-dashboard; personal research)"
+  timeout_seconds: 60
+  retries: 3
+
+openrouter:
+  base_url: "https://openrouter.ai"
+  # Keyless endpoints used by the public rankings page (undocumented; may change).
+  model_chart: "/api/frontend/v1/rankings/model-rankings-chart"   # weekly tokens, top models + Others
+  author_share: "/api/frontend/v1/rankings/market-share"          # weekly tokens by model author
+  model_week: "/api/frontend/v1/rankings/models?view=week"        # per-model prompt/completion, last 7 days
+  task_spend: "/api/frontend/v1/rankings/task-spend"              # 30-day spend share by task
+  models_catalog: "/api/v1/models"                                # public price list
+  # Official dataset API, used automatically when OPENROUTER_API_KEY is set.
+  datasets_api: "/api/v1/datasets/rankings-daily"
+
+metrics:
+  # Prompt tokens per completion token. null = measure it from the weekly per-model snapshot
+  # (observed ~38:1 in Sep 2026, because agentic/coding traffic re-sends large contexts).
+  prompt_completion_ratio: null
+  fallback_prompt_completion_ratio: 30
+  elasticity_window_weeks: 12
+  moving_average_weeks: 4
+  drop_incomplete_last_week: true
+
+btos:
+  national_url: "https://www.census.gov/hfp/btos/downloads/National.xlsx"
+  sector_url: "https://www.census.gov/hfp/btos/downloads/Sector.xlsx"
+  question_use: 7      # "In the last two weeks, did this business use AI ...?"
+  question_expect: 24  # "During the next six months, do you think this business will be using AI ...?"
+  sectors:             # NAICS 2-digit codes shown as dashed lines
+    "51": "Information"
+    "52": "Finance & Insurance"
+    "54": "Professional Services"
+    "61": "Educational Services"
+    "62": "Health Care"
+    "31": "Manufacturing"
+    "44": "Retail Trade"
+    "23": "Construction"
+
+microsoft:
+  # Our World in Data republishes Microsoft's AI user share with a World aggregate (CC BY 4.0).
+  owid_csv: "https://ourworldindata.org/grapher/estimated-share-people-generative-ai.csv?v=1&csvType=full&useColumnShortNames=true"
+  diffusion_csv: "https://raw.githubusercontent.com/microsoft/ai-diffusion-report/main/data/AI_Diffusion_Q12026_Update.csv"
+  countries: ["United States", "United Kingdom", "Germany", "France", "Japan", "India", "China", "Brazil"]
+
+server:
+  host: "127.0.0.1"
+  port: 8765

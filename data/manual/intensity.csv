@@ -1,0 +1,18 @@
+date,source,population,metric,value,source_url
+2025-05-15,Gallup,US employees,total_few_times_year_plus,40,https://www.gallup.com/workplace/699689/ai-use-at-work-rises.aspx
+2025-05-15,Gallup,US employees,frequent_few_times_week_plus,19,https://www.gallup.com/workplace/699689/ai-use-at-work-rises.aspx
+2025-05-15,Gallup,US employees,daily,8,https://www.gallup.com/workplace/699689/ai-use-at-work-rises.aspx
+2025-08-12,Gallup,US employees,total_few_times_year_plus,45,https://www.gallup.com/workplace/699689/ai-use-at-work-rises.aspx
+2025-08-12,Gallup,US employees,frequent_few_times_week_plus,23,https://www.gallup.com/workplace/699689/ai-use-at-work-rises.aspx
+2025-08-12,Gallup,US employees,daily,10,https://www.gallup.com/workplace/699689/ai-use-at-work-rises.aspx
+2025-11-15,Gallup,US employees,total_few_times_year_plus,46,https://www.gallup.com/workplace/704225/rising-adoption-spurs-workforce-changes.aspx
+2025-11-15,Gallup,US employees,frequent_few_times_week_plus,26,https://www.gallup.com/workplace/704225/rising-adoption-spurs-workforce-changes.aspx
+2025-11-15,Gallup,US employees,daily,12,https://www.gallup.com/workplace/704225/rising-adoption-spurs-workforce-changes.aspx
+2026-02-12,Gallup,US employees,total_few_times_year_plus,50,https://www.gallup.com/workplace/704225/rising-adoption-spurs-workforce-changes.aspx
+2026-02-12,Gallup,US employees,frequent_few_times_week_plus,28,https://www.gallup.com/workplace/704225/rising-adoption-spurs-workforce-changes.aspx
+2026-02-12,Gallup,US employees,daily,13,https://www.gallup.com/workplace/704225/rising-adoption-spurs-workforce-changes.aspx
+2023-07-01,Pew,US adults,ever_used_chatbot,18,https://www.pewresearch.org/internet/2026/06/17/americans-and-ai-2026-chatbots-smart-devices-and-views-on-impact/
+2024-07-01,Pew,US adults,ever_used_chatbot,33,https://www.pewresearch.org/internet/2026/06/17/americans-and-ai-2026-chatbots-smart-devices-and-views-on-impact/
+2025-07-01,Pew,US adults,ever_used_chatbot,34,https://www.pewresearch.org/internet/2026/06/17/americans-and-ai-2026-chatbots-smart-devices-and-views-on-impact/
+2026-02-20,Pew,US adults,ever_used_chatbot,49,https://www.pewresearch.org/internet/2026/06/17/americans-and-ai-2026-chatbots-smart-devices-and-views-on-impact/
+2026-02-20,Pew,US adults,daily,24,https://www.pewresearch.org/internet/2026/06/17/americans-and-ai-2026-chatbots-smart-devices-and-views-on-impact/
