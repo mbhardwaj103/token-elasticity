@@ -80,13 +80,15 @@ ROWS = [
 ]
 
 
-def _change(key: str, cur: dict, prev: dict, dfmt) -> str:
+def _change(key: str, cur: dict, prev: dict, fmt, dfmt) -> str:
     a, b = cur.get(key), (prev or {}).get(key)
     if not isinstance(a, (int, float)) or not isinstance(b, (int, float)):
         return ""
-    delta = a - b
-    if abs(delta) < 1e-9:
+    # Compare as displayed: an $8 move on $36.9M is invisible in the Now column,
+    # so reporting it as a change is noise.
+    if fmt(a) == fmt(b):
         return "unchanged"
+    delta = a - b
     return ("+" if delta > 0 else "-") + dfmt(abs(delta))
 
 
@@ -128,12 +130,15 @@ def build(cur: dict, prev: dict | None, site_url: str,
         "| Metric | Now | Since last run |",
         "| --- | --- | --- |",
     ]
+    changes = []
     for key, label, fmt, dfmt in ROWS:
         v = k.get(key)
         value = fmt(v) if isinstance(v, (int, float)) else "n/a"
-        lines.append(f"| {label} | **{value}** | {_change(key, k, prev_kpis, dfmt)} |")
+        change = _change(key, k, prev_kpis, fmt, dfmt)
+        changes.append(change)
+        lines.append(f"| {label} | **{value}** | {change} |")
 
-    if prev is not None and all(prev_kpis.get(key) == k.get(key) for key, *_ in ROWS):
+    if prev is not None and changes and all(c == "unchanged" for c in changes):
         lines += ["", "_No KPI changed since the previous run — the upstream weekly data has "
                   "not refreshed yet._"]
 

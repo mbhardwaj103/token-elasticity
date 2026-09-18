@@ -50,8 +50,16 @@ always go through `serve.py`.
   `data/build.log`. Already registered on this machine as of 2026-09-13. It now only keeps
   the *local* copy fresh — the published dashboard is built in CI.
 - `.github/workflows/daily.yml` — the real refresh. Runs 12:00 UTC daily (07:00 CDT / 06:00
-  CST), rebuilds, runs tests, emails a digest, deploys `dashboard/` to GitHub Pages at
-  <https://mbhardwaj103.github.io/token-elasticity/>. Repo: `mbhardwaj103/token-elasticity`.
+  CST) in three jobs: `refresh` (build, test, render chart PNGs) → `deploy` (Pages) →
+  `notify` (post the digest issue). Site: <https://mbhardwaj103.github.io/token-elasticity/>,
+  repo `mbhardwaj103/token-elasticity`. **`notify` must stay after `deploy`** — GitHub's
+  image proxy fetches on render and caches the result, so posting before the PNGs are live
+  pins a 404 in the email.
+- `scripts/render_charts.py` — static matplotlib twins of the first five charts for the
+  email, into git-ignored `dashboard/email/`. Follows the `dataviz` skill and reuses the
+  dashboard's `--s1..--s8` palette. Run the skill's `validate_palette.py` (there is a Python
+  twin of the JS validator; no Node on this machine) before changing any series colour —
+  `--s2` against `--s4` fails the normal-vision floor, which is why same-model price is `--s7`.
 - `scripts/email_digest.py` — renders `dashboard.json` as a Markdown digest and diffs every
   KPI against the previous run. The workflow posts it as a GitHub issue (label `digest`) with
   the built-in `GITHUB_TOKEN` and a `cc @owner` mention; GitHub's notifications do the

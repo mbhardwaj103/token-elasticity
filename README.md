@@ -34,10 +34,24 @@ it shifts an hour with daylight saving), and can also be run by hand from the Ac
 rebuilds the data, runs the metric tests, emails a digest, and publishes `dashboard/` to GitHub Pages.
 Every source is public and keyless, so no API credentials are needed for the build itself.
 
-`scripts/email_digest.py` renders the digest and compares each KPI against the previous run, so the
-mail shows what actually moved. Upstream data is weekly, so most mornings read "unchanged" — that is
-the expected result, not a failure. If a source fails, the affected chart keeps its last good value
-and the failure is listed in the digest.
+The digest leads with the dashboard link, then a KPI table, then the five charts of the
+"Token usage, price and spend" section. `scripts/email_digest.py` compares each KPI against the
+previous run and reports the change *as displayed* — if the Now column is unmoved, the row reads
+"unchanged" rather than reporting an $8 drift on $36.9M. Upstream data is weekly, so most mornings
+read "unchanged" throughout; that is the expected result, not a failure. If a source fails, the
+affected chart keeps its last good value and the failure is listed in the digest.
+
+Email clients cannot run ECharts, so `scripts/render_charts.py` draws static matplotlib twins of
+those five charts into `dashboard/email/` (git-ignored; regenerated each build) and they publish
+with the site. The digest links them by URL with a `?v=<run id>` query, which stops GitHub's image
+proxy from serving the first day's PNG forever. This is why `notify` is a separate job that runs
+*after* `deploy`: the proxy fetches on render and caches whatever it gets, so posting before Pages
+is live would pin a 404.
+
+The charts follow the `dataviz` skill — the dashboard's own categorical palette, one axis per chart,
+a legend plus direct end labels. Validate any palette change with the skill's checker rather than by
+eye; that is how the same-model price line ended up on `--s7` instead of the neighbouring `--s4`
+(orange against amber scored ΔE 13.7 for normal vision, under the hard floor of 15).
 
 **No mail credentials are involved.** The workflow posts the digest as a GitHub issue labelled
 `digest` using the built-in `GITHUB_TOKEN`, and GitHub emails it out through ordinary notifications.
