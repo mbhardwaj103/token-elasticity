@@ -1,7 +1,10 @@
 # Token Elasticity
 
-A local dashboard that tracks whether AI use is growing, whether tokens are getting cheaper,
+A dashboard that tracks whether AI use is growing, whether tokens are getting cheaper,
 how volume responds to price (elasticity), and how fast people and businesses are adopting AI.
+
+**Live:** <https://mbhardwaj103.github.io/token-elasticity/> — rebuilt every morning at
+07:00 US Central by [`.github/workflows/daily.yml`](.github/workflows/daily.yml).
 
 ## Run it
 
@@ -17,11 +20,39 @@ uv pip install --python .venv\Scripts\python.exe -r requirements.txt
 The **Refresh data** button on the page reruns the pipeline through `serve.py` (about 1 minute).
 Opening `dashboard/index.html` directly from disk will not work: browsers block `fetch` from `file://`.
 
-**Weekly refresh:** `scripts\register_weekly_task.ps1` registers the `TokenElasticityWeekly` task
-(Mondays 08:00), which runs `scripts\run_build.cmd` and logs to `data\build.log`.
-Remove it with `schtasks /Delete /TN TokenElasticityWeekly /F`.
+**Weekly refresh (local):** `scripts\register_weekly_task.ps1` registers the `TokenElasticityWeekly`
+task (Mondays 08:00), which runs `scripts\run_build.cmd` and logs to `data\build.log`.
+Remove it with `schtasks /Delete /TN TokenElasticityWeekly /F`. This only keeps the local copy
+fresh; the published dashboard is built in CI.
 
 **Tests:** `.venv\Scripts\python -m pytest tests`
+
+## Daily refresh and email digest
+
+`.github/workflows/daily.yml` runs at 12:00 UTC (07:00 CDT / 06:00 CST — cron is always UTC, so
+it shifts an hour with daylight saving), and can also be run by hand from the Actions tab. Each run
+rebuilds the data, runs the metric tests, emails a digest, and publishes `dashboard/` to GitHub Pages.
+Every source is public and keyless, so no API credentials are needed for the build itself.
+
+`scripts/email_digest.py` renders the digest and compares each KPI against the previous run, so the
+mail shows what actually moved. Upstream data is weekly, so most mornings read "unchanged" — that is
+the expected result, not a failure. If a source fails, the affected chart keeps its last good value
+and the failure is listed in the mail.
+
+Delivery is plain `smtplib`, configured by repository secrets:
+
+| Secret | Purpose |
+|---|---|
+| `SMTP_USER` | Sending Gmail address |
+| `SMTP_PASS` | Google **app password** (not the account password; requires 2-Step Verification) |
+| `MAIL_TO` | Recipient; defaults to `SMTP_USER` |
+| `SMTP_HOST` / `SMTP_PORT` | Optional, default `smtp.gmail.com` / `587` |
+
+With `SMTP_PASS` unset the workflow still builds and deploys — it just skips the send.
+
+Daily source snapshots (`data/raw/`, ~3 MB/day) are **not** committed; CI carries them in the Actions
+cache instead, so the repository does not grow without bound. `data/cache/wayback/` *is* tracked,
+because those archived price lists cannot be refetched cheaply.
 
 ## Data sources
 

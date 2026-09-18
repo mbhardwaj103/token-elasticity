@@ -47,7 +47,14 @@ always go through `serve.py`.
   these by hand when new survey waves are published; there's no API for them.
 - `scripts/register_weekly_task.ps1` registers a Windows Task Scheduler job
   (`TokenElasticityWeekly`, Mondays 08:00) running `scripts/run_build.cmd`, which logs to
-  `data/build.log`. Already registered on this machine as of 2026-09-13.
+  `data/build.log`. Already registered on this machine as of 2026-09-13. It now only keeps
+  the *local* copy fresh — the published dashboard is built in CI.
+- `.github/workflows/daily.yml` — the real refresh. Runs 12:00 UTC daily (07:00 CDT / 06:00
+  CST), rebuilds, runs tests, emails a digest, deploys `dashboard/` to GitHub Pages at
+  <https://mbhardwaj103.github.io/token-elasticity/>. Repo: `mbhardwaj103/token-elasticity`.
+- `scripts/email_digest.py` — renders `dashboard.json` as an HTML mail and diffs every KPI
+  against the previous run. Sends via stdlib `smtplib` (no third-party action handles the
+  SMTP password); skips silently when `SMTP_PASS` is unset.
 
 ## Key facts worth remembering
 
@@ -67,6 +74,11 @@ always go through `serve.py`.
 - Prompt:completion blending ratio is measured live from the weekly snapshot each run
   (~38:1 as of Sep 2026 — much higher than a naive chat assumption, driven by
   agentic/coding traffic re-sending large contexts).
+
+- `data/raw/` is **gitignored** (~3 MB/day would bloat the repo permanently); CI carries it plus
+  `data/cache/` and the previous `dashboard.json` in the Actions cache, keyed `te-data-<run_id>`
+  with `restore-keys: te-data-`. `data/cache/wayback/` *is* tracked — archived price lists can't
+  be refetched cheaply. Nothing is committed back from CI; Pages deploys the fresh artifact.
 
 ## Conventions
 
