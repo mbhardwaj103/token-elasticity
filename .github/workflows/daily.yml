@@ -62,14 +62,20 @@ jobs:
         with:
           path: dashboard
 
-      # Carries the two JSON files the digest needs into the notify job.
+      # Carries the two JSON files the digest needs into the notify job. Staged into
+      # one directory first: upload-artifact roots the archive at the paths' common
+      # ancestor, which for two unrelated trees is not what the consumer expects.
+      - name: Stage digest inputs
+        run: |
+          mkdir -p digest-inputs
+          cp dashboard/data/dashboard.json digest-inputs/current.json
+          cp "${RUNNER_TEMP}/prev.json" digest-inputs/prev.json || true
+
       - name: Upload digest inputs
         uses: actions/upload-artifact@v4
         with:
           name: digest-inputs
-          path: |
-            dashboard/data/dashboard.json
-            ${{ runner.temp }}/prev.json
+          path: digest-inputs
           if-no-files-found: warn
           retention-days: 1
 
@@ -120,7 +126,7 @@ jobs:
           SITE: ${{ needs.deploy.outputs.page_url }}
         run: |
           python -m scripts.email_digest \
-            --current digest-inputs/dashboard/data/dashboard.json \
+            --current digest-inputs/current.json \
             --previous digest-inputs/prev.json \
             --out "${RUNNER_TEMP}/digest.md" \
             --subject-out "${RUNNER_TEMP}/subject.txt" \
