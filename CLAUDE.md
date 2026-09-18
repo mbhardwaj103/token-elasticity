@@ -52,9 +52,11 @@ always go through `serve.py`.
 - `.github/workflows/daily.yml` — the real refresh. Runs 12:00 UTC daily (07:00 CDT / 06:00
   CST), rebuilds, runs tests, emails a digest, deploys `dashboard/` to GitHub Pages at
   <https://mbhardwaj103.github.io/token-elasticity/>. Repo: `mbhardwaj103/token-elasticity`.
-- `scripts/email_digest.py` — renders `dashboard.json` as an HTML mail and diffs every KPI
-  against the previous run. Sends via stdlib `smtplib` (no third-party action handles the
-  SMTP password); skips silently when `SMTP_PASS` is unset.
+- `scripts/email_digest.py` — renders `dashboard.json` as a Markdown digest and diffs every
+  KPI against the previous run. The workflow posts it as a GitHub issue (label `digest`) with
+  the built-in `GITHUB_TOKEN` and a `cc @owner` mention; GitHub's notifications do the
+  emailing, so there are **no mail credentials anywhere in this repo**. Don't reintroduce
+  SMTP — the user explicitly rejected handing over a Gmail app password.
 
 ## Key facts worth remembering
 

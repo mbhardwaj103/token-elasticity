@@ -37,18 +37,19 @@ Every source is public and keyless, so no API credentials are needed for the bui
 `scripts/email_digest.py` renders the digest and compares each KPI against the previous run, so the
 mail shows what actually moved. Upstream data is weekly, so most mornings read "unchanged" — that is
 the expected result, not a failure. If a source fails, the affected chart keeps its last good value
-and the failure is listed in the mail.
+and the failure is listed in the digest.
 
-Delivery is plain `smtplib`, configured by repository secrets:
+**No mail credentials are involved.** The workflow posts the digest as a GitHub issue labelled
+`digest` using the built-in `GITHUB_TOKEN`, and GitHub emails it out through ordinary notifications.
+The body ends with a `cc @owner` line so the mention fires even if the repo is not being watched.
+Delivery is therefore governed by GitHub notification settings rather than an SMTP password.
 
-| Secret | Purpose |
-|---|---|
-| `SMTP_USER` | Sending Gmail address |
-| `SMTP_PASS` | Google **app password** (not the account password; requires 2-Step Verification) |
-| `MAIL_TO` | Recipient; defaults to `SMTP_USER` |
-| `SMTP_HOST` / `SMTP_PORT` | Optional, default `smtp.gmail.com` / `587` |
+Each run opens one issue. To clear old ones out:
 
-With `SMTP_PASS` unset the workflow still builds and deploys — it just skips the send.
+```bash
+gh issue list --label digest --state open --limit 200 --json number --jq '.[].number' \
+  | xargs -n1 gh issue close
+```
 
 Daily source snapshots (`data/raw/`, ~3 MB/day) are **not** committed; CI carries them in the Actions
 cache instead, so the repository does not grow without bound. `data/cache/wayback/` *is* tracked,

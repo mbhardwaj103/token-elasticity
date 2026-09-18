@@ -8,6 +8,7 @@ on:
 
 permissions:
   contents: read
+  issues: write
   pages: write
   id-token: write
 
@@ -55,22 +56,26 @@ jobs:
         continue-on-error: true
         run: python -m pytest tests -q
 
-      - name: Send email digest
+      # Posting the digest as an issue makes GitHub send it by email, so no mail
+      # credentials are needed. The cc line guarantees a mention notification even if
+      # the repo is not being watched.
+      - name: Post digest
         if: ${{ !cancelled() }}
         env:
-          SMTP_HOST: ${{ secrets.SMTP_HOST || 'smtp.gmail.com' }}
-          SMTP_PORT: ${{ secrets.SMTP_PORT || '587' }}
-          SMTP_USER: ${{ secrets.SMTP_USER }}
-          SMTP_PASS: ${{ secrets.SMTP_PASS }}
-          MAIL_TO: ${{ secrets.MAIL_TO }}
+          GH_TOKEN: ${{ github.token }}
         run: |
           python -m scripts.email_digest \
             --current dashboard/data/dashboard.json \
             --previous "${RUNNER_TEMP}/prev.json" \
-            --out "${RUNNER_TEMP}/digest.html" \
+            --out "${RUNNER_TEMP}/digest.md" \
             --subject-out "${RUNNER_TEMP}/subject.txt" \
-            --site-url "${{ steps.pages.outputs.base_url }}" \
-            --send
+            --site-url "${{ steps.pages.outputs.base_url }}"
+          printf '\n\ncc @%s\n' '${{ github.repository_owner }}' >> "${RUNNER_TEMP}/digest.md"
+          gh label create digest --color 0E8A16 --description "Daily dashboard digest" --force
+          gh issue create \
+            --title "$(cat "${RUNNER_TEMP}/subject.txt")" \
+            --body-file "${RUNNER_TEMP}/digest.md" \
+            --label digest
 
       - uses: actions/upload-pages-artifact@v3
         with:
